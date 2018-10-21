@@ -26,8 +26,6 @@ const prefix = "5";
 
 var servers = {};
 
-console.log 'ONline'
-
 /////////////////////////
 ////////////////////////
 
