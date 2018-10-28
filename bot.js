@@ -1,604 +1,933 @@
-const errorlog = require("./data/errors.json")
-const thing = require('mathjs')
-const maths = thing.parser()
-const Discord = require("discord.js")
-const started = Date()
-const config = require('./config.json')
-const bot = new Discord.Client()
-const notes = require('./data/notes.json')
-const os = require('os')
-const prefix = config.prefix
-const rb = "```"
-const sbl = require("./data/blservers.json")
-const ubl = require("./data/blusers.json")
-const fs = require("fs")
-const warns = require("./data/warns.json")
-const queues = {}
-const ytdl = require('ytdl-core')
-const search = require('youtube-search')
-const opts = {
-  part: 'snippet',
-  maxResults: 10,
-  key: config.youtube_api_key
+const Discord = require('discord.js');
+
+const Util = require('discord.js');
+
+const getYoutubeID = require('get-youtube-id');
+
+const fetchVideoInfo = require('youtube-info');
+
+const YouTube = require('simple-youtube-api');
+
+const youtube = new YouTube("AIzaSyAdORXg7UZUo7sePv97JyoDqtQVi3Ll0b8");
+
+const queue = new Map();
+
+const ffmpeg = require('ffmpeg');
+
+const ytdl = require('ytdl-core');
+
+const fs = require('fs');
+
+const gif = require("gif-search");
+
+const client = new Discord.Client({disableEveryone: true});
+
+const prefix = "5";
+
+var servers = {};
+function play(connection, message, args) {
+  var server = servers[message.guild.id];
+  server.dispatcher = connection.playStream(YTDL(args[0]), {filter: "audioonly"});
+  server.queue.shift();
+  server.dispatcher.on("end", function() {
+    if (server.queue[0]) play(connection, message);
+    else connection.disconnect();
+  });
 }
 
-function getQueue(guild) {
-  if (!guild) return
-  if (typeof guild == 'object') guild = guild.id
-  if (queues[guild]) return queues[guild]
-  else queues[guild] = []
-  return queues[guild]
-}
 
-var express = require("express")
-var app = express();
+client.on('message', message =>{
+  if(message.content.startsWith('join')){
+    const voiceChannel = message.member.voiceChannel
+    voiceChannel.join();
+    message.channel.send("تم الأتصال بالروم الصوتي")
+}})
+/////////////////////////
+////////////////////////
 
-app.get("/queue/:guildid",function(req,res){
-  let queue = getQueue(req.params.guildid);
-    if(queue.length == 0) return res.send("Uh oh... No music!");
-    let text = '';
-    for(let i = 0; i < queue.length; i++){
-      text += `${(i + 1)}. ${queue[i].title} | by ${queue[i].requested}\n`
-    };
-  res.send(text)
-})
-        app.listen(config.server_port)
+client.on('message', message =>{
+  if(message.content.startsWith('join')){
+    const voiceChannel = message.member.voiceChannel
+    voiceChannel.join();
+    message.channel.send("تم الأتصال بالروم الصوتي")
+}})
 
-
-function play(msg, queue, song) {
-  if (!msg || !queue) return
-  if (song) {
-    search(song, opts, function(err, results) {
-      if (err) return bot.sendMessage(msg, "Video not found please try to use a youtube video.");
-      song = (song.includes("https://" || "http://")) ? song : results[0].link
-      let stream = ytdl(song, {
-        audioonly: true
-      })
-      let test
-      if (queue.length === 0) test = true
-      queue.push({
-        "title": results[0].title,
-        "requested": msg.author.username,
-        "toplay": stream
-      })
-      bot.sendMessage(msg, "Queued **" + queue[queue.length - 1].title + "**")
-      if (test) {
-        setTimeout(function() {
-          play(msg, queue)
-        }, 1000)
-      }
-    })
-  } else if (queue.length != 0) {
-    bot.sendMessage(msg, `Now Playing **${queue[0].title}** | by ***${queue[0].requested}***`)
-    let connection = bot.voiceConnections.get('server', msg.server)
-    if (!connection) return
-    connection.playRawStream(queue[0].toplay).then(intent => {
-      intent.on('error', () => {
-        queue.shift()
-        play(msg, queue)
-      })
-
-      intent.on('end', () => {
-        queue.shift()
-        play(msg, queue)
-      })
-    })
-  } else {
-    bot.sendMessage(msg, 'No more music in queue')
+const devs = ['422829377139638273' , '' , '' , ''];
+const adminprefix = "!";
+client.on('message', message => {
+    var argresult = message.content.split(` `).slice(1).join(' ');
+      if (!devs.includes(message.author.id)) return;
+      
+  if (message.content.startsWith(adminprefix + 'ply')) {
+    client.user.setGame(argresult);
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  } else 
+  if (message.content.startsWith(adminprefix + 'wt')) {
+  client.user.setActivity(argresult, {type:'WATCHING'});
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  } else 
+  if (message.content.startsWith(adminprefix + 'ls')) {
+  client.user.setActivity(argresult , {type:'LISTENING'});
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  } else 
+  if (message.content.startsWith(adminprefix + 'st')) {
+    client.user.setGame(argresult, "https://www.twitch.tv/حب بلا حدود");
+      message.channel.sendMessage(`**✅   ${argresult}**`)
   }
-}
+  });
 
-function secondsToString(seconds) {
-    try {
-        var numyears = Math.floor(seconds / 31536000);
-        var numdays = Math.floor((seconds % 31536000) / 86400);
-        var numhours = Math.floor(((seconds % 31536000) % 86400) / 3600);
-        var numminutes = Math.floor((((seconds % 31536000) % 86400) % 3600) / 60);
-        var numseconds = Math.round((((seconds % 31536000) % 86400) % 3600) % 60);
 
-        var str = "";
-        if(numyears>0) {
-            str += numyears + " year" + (numyears==1 ? "" : "s") + " ";
-        }
-        if(numdays>0) {
-            str += numdays + " day" + (numdays==1 ? "" : "s") + " ";
-        }
-        if(numhours>0) {
-            str += numhours + " hour" + (numhours==1 ? "" : "s") + " ";
-        }
-        if(numminutes>0) {
-            str += numminutes + " minute" + (numminutes==1 ? "" : "s") + " ";
-        }
-        if(numseconds>0) {
-            str += numseconds + " second" + (numseconds==1 ? "" : "s") + " ";
-        }
-        return str;
-    } catch(err) {
-        console.log("Could not get time")
-        return 'Could not get time';
+client.on('message', async msg =>{
+	if (msg.author.bot) return undefined;
+    if (!msg.content.startsWith(prefix)) return undefined;
+    
+    let args = msg.content.split(' ');
+
+	let command = msg.content.toLowerCase().split(" ")[0];
+	command = command.slice(prefix.length)
+
+    if(command === `ping`) {
+    let embed = new Discord.RichEmbed()
+    .setColor(3447003)
+    .setTitle("Pong!!")
+    .setDescription(`${client.ping} ms,`)
+    .setFooter(`Requested by | ${msg.author.tag}`);
+    msg.delete().catch(O_o=>{})
+    msg.channel.send(embed);
     }
-}
+});
+/////////////////////////
+////////////////////////
+//////////////////////
+client.on('message', async msg =>{
+	if (msg.author.bot) return undefined;
+    if (!msg.content.startsWith(prefix)) return undefined;
+    
+    let args = msg.content.split(' ');
 
-bot.on('ready', function() {
-  bot.setStatus('online', config.status)
-  var msg = `
------------------------------
-Use 'git pull' to keep your bot updated
-Logging in...
------------------------------
-Logged in as ${bot.user.name}
-On ${bot.servers.length} servers with ${bot.channels.length} channels
-I have seen ${bot.users.length} users
-Let's go!
------------------------------`
+	let command = msg.content.toLowerCase().split(" ")[0];
+	command = command.slice(prefix.length)
 
-console.log(msg)
-console.log("Logged in and ready to respond...")
-})
-
-bot.on("message", function(message) {
-  try{
-  if (message.sender.bot) return
-  if (message.channel.server === undefined && message.sender != bot.user) {
-    bot.sendMessage(message, "Bot only works in Servers, not Private Messages (This is so blacklist system works properely)")
-
-    return;
-  }
-  if (sbl.indexOf(message.channel.server.id) != -1 && message.content.startsWith(prefix)) {
-    bot.sendMessage(message, "This server is blacklisted")
-    return
-  }
-  if (ubl.indexOf(message.sender.id) != -1 && message.content.startsWith(prefix)) {
-    bot.sendMessage(message, message.user + "! You are blacklisted and can not use the bot!")
-    return
-  }
-  if (message.content.startsWith(prefix + "ping")) {
-    bot.sendMessage(message, "Pong!", function(error, msg) {
-      if (!error) {
-        bot.updateMessage(msg, "Pong, **" + (msg.timestamp - message.timestamp) + "**ms")
-      }
-    })
-  }
-  if(message.content.startsWith(prefix + 'math')) {
-    try{
-    var res = maths.eval(message.content.split(" ").splice(1).join(" "))
-  }catch(err){
-    var res = 'Could not calculate'
-  }
-    bot.sendMessage("```"+message,res+"```")
-  }
-
-  if (message.content.startsWith(prefix + 'help')) {
-    bot.sendMessage(message, "Check your DM's **" + message.sender.name + "**")
-    bot.sendMessage(message.sender.id, `${rb}ruby
-${prefix}help - Shows this message.
-${prefix}ping - Ping/Pong with ms amount.
-${prefix}servers Shows amount of servers.
-${prefix}play - Plays the song you requested.
-${prefix}voteskip - You may vote to skip a song.
-${prefix}volume <volume> - Change the volume.
-${prefix}queue - Check the list of songs that are queued.
-${prefix}np/nowplaying - Check the current song out.
-${prefix}skip - Skips the playing song.
-${prefix}pause - Pause the current song.
-${prefix}deletewarn <user> - Deletes a warning from a user.
-${prefix}lookupwarn <user> - Lookup warning information on a user.
-${prefix}eval - Owner only.
-${prefix}clearqueue - Clears the list of queues.
-${prefix}say - Admin only.
-${prefix}resume - Resumes paused song.
-${prefix}shutdown - Power off the bot (Owner only).
-${prefix}play - Plays a link that you have wanted it to.
-${prefix}userblacklist <add/remove> <user id> - Blacklists a user
-${prefix}warn <user> <reason> - Warns a user for the thing they did wrong.
-${prefix}reminder <time>|<reminder> - Reminds you of something in a certain time
-${prefix}serverblacklist <add/remove> <server id> - Adds or removes servers from blacklist
-${prefix}note - Takes a note
-${prefix}mynotes - Shows notes you have taken
-${prefix}math <maths> - evaluates math equations
-${prefix}uptime - Shows bot uptime
-${prefix}sys - Gets system information${rb}`)
-  }
-  if (message.content.startsWith(prefix + 'servers')) {
-    bot.sendMessage(message, "I'm currently on **" + bot.servers.length + "** server(s)")
-  }
-  if(message.content === prefix + 'uptime'){
-    bot.sendMessage(message,"I have been up for `"+secondsToString(process.uptime())+"` - My process was started at this time --> `"+started+"`")
-  }
-
-  if (message.content.startsWith(prefix + 'play')) {
-    if (!bot.voiceConnections.get('server', message.server)) {
-      if (!message.author.voiceChannel) return bot.sendMessage(message, 'You need to be in a voice channel')
-      bot.joinVoiceChannel(message.author.voiceChannel)
-    }
-    let suffix = message.content.split(" ").slice(1).join(" ")
-    if (!suffix) return bot.sendMessage(message, 'You need to a song link or a song name')
-    play(message, getQueue(message.server.id), suffix)
-  }
-
-  if(message.content.startsWith(prefix + 'sys')){
-    bot.sendMessage(message, "```xl\nSystem info: " + process.platform + "-" + process.arch + " with " + process.release.name + " version " + process.version.slice(1) + "\nProcess info: PID " + process.pid + " at " + process.cwd() + "\nProcess memory usage: " + Math.ceil(process.memoryUsage().heapTotal / 1000000) + " MB\nSystem memory usage: " + Math.ceil((os.totalmem() - os.freemem()) / 1000000) + " of " + Math.ceil(os.totalmem() / 1000000) + " MB\nBot info: ID " + bot.user.id + " #" + bot.user.discriminator + "\n```");
-        }
-  if (message.content.startsWith(prefix + "serverblacklist")) {
-    if (message.sender.id === config.owner_id || config.admins.indexOf(msg.author.id)!= -1) {
-      let c = message.content.split(" ").splice(1).join(" ")
-      let args = c.split(" ")
-      console.log("[DEVELOPER DEBUG] Blacklist args were: " + args)
-      if (args[0] === "remove") {
-        sbl.splice(sbl.indexOf(args[1]))
-        fs.writeFile("./data/blservers.json", JSON.stringify(sbl))
-      } else if (args[0] === "add") {
-        sbl.push(args[1])
-        fs.writeFile("./data/blservers.json", JSON.stringify(sbl))
-      } else {
-        bot.sendMessage(message, `You need to specify what to do! ${prefix}serverblacklist <add/remove> <server id>`)
-      }
-    } else {
-      bot.sendMessage(message, "Sorry, this command is for the owner only.")
-    }
-
-  }
-  if(message.content.startsWith(prefix + 'note')) {
-    if(notes[message.author.id] === undefined){
-      notes[message.author.id] = {
-        'notes':[]
-      }
-    }
-    notes[message.author.id].notes[notes[message.author.id].notes.length] = {
-      'content':message.cleanContent.split(" ").splice(1).join(" "),
-      'time':Date()
-    }
-    fs.writeFile('./data/notes.json',JSON.stringify(notes),function(err){
-      if(err) return;
-      bot.sendMessage(message,'Added to notes! Type `'+prefix+'mynotes` to see all your notes')
-    })
-  }
-  if(message.content === prefix + 'mynotes'){
-    var nutes = 'Here are your notes:\n\n```'
-    for(var i = 0;i < notes[message.author.id].notes.length;i++){
-      nutes += `${i + 1}) '${notes[message.author.id].notes[i].content}' - Added ${notes[message.author.id].notes[i].time}\n`
-    }
-
-    nutes += "```"
-    bot.sendMessage(message,nutes)
-  }
-  if (message.content.startsWith(prefix + "userblacklist")) {
-    if (message.sender.id === config.owner_id || config.admins.indexOf(message.author.id)!= -1) {
-      let c = message.content.split(" ").splice(1).join(" ")
-      let args = c.split(" ")
-      console.log("[DEVELOPER DEBUG] Blacklist args were: " + args)
-      if (args[0] === "remove") {
-        ubl.splice(ubl.indexOf(args[1]))
-        fs.writeFile("./data/blusers.json", JSON.stringify(ubl))
-      } else if (args[0] === "add") {
-        ubl.push(args[1])
-        fs.writeFile("./data/blusers.json", JSON.stringify(sbl))
-      } else {
-        bot.sendMessage(message, `You need to specify what to do! ${prefix}serverblacklist <add/remove> <server id>`)
-      }
-    } else {
-      bot.sendMessage(message, "Sorry, this command is for the owner only.")
-    }
-
-  }
-
-  if(message.content.startsWith(prefix + "clearqueue")){
-    if(message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1 || message.server.permissionsOf(message.author).hasPermission('MANAGE_SERVER')){
-     let queue = getQueue(message.server.id);
-     if(queue.length == 0) return bot.sendMessage(message, `No music in queue`);
-     for(var i = queue.length - 1;  i >= 0; i--){
-            queue.splice(i, 1);
-     }
-     bot.sendMessage(message, `Cleared the queue`)
-    }else{
-      bot.sendMessage(message, 'Only the admins can do this command');
-    }
-}
-
-  if(message.content.startsWith(prefix + "lookupwarn")){
-    if(message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1 || message.server.permissionsOf(message.author).hasPermission('MANAGE_SERVER')){
-      let user = message.mentions[0];
-      if(!user) return bot.sendMessage(message, "You need to mention the user");
-      let list = Object.keys(warns);
-      let found = '';
-      let foundCounter = 0;
-      let warnCase;
-      //looking for the case id
-      for(let i = 0; i < list.length; i++){
-          if(warns[list[i]].user.id == user.id){
-              foundCounter++;
-              found += `${(foundCounter)}. Username: ${warns[list[i]].user.name}\nAdmin: ${warns[list[i]].admin.name}\nServer: ${warns[list[i]].server.name}\nReason: ${warns[list[i]].reason}\n`;
-          }
-      }
-      if(foundCounter == 0) return bot.sendMessage(message, 'Nothing found for this user');
-      bot.sendMessage(message, `Found ${foundCounter} warns\n ${found}`);
-    }else{
-      bot.sendMessage(message, 'Only the admins can do this command');
-    }
-}
-
-  if (message.content.startsWith(prefix + 'skip')) {
-    if(message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1 || message.server.permissionsOf(message.author).hasPermission('MANAGE_SERVER')){
-      let player = bot.voiceConnections.get('server', message.server);
-      if(!player || !player.playing) return bot.sendMessage(message, 'The bot is not playing');
-      player.stopPlaying()
-      bot.sendMessage(message, 'Skipping song...');
-    }else{
-      bot.sendMessage(message, 'Only the admins can do this command');
-    }
-  }
-
-  if(message.content.startsWith(prefix + "deletewarn")){
-    if (message.channel.permissionsOf(message.sender).hasPermission("kickMembers") || message.channel.permissionsOf(message.sender).hasPermission("banMembers") || message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1) {
-        let user = message.mentions[0];
-        if(!user) return bot.sendMessage(message, "You need to mention the user");
-        let list = Object.keys(warns);
-        let found;
-        //looking for the case id
-        for(let i = 0; i < list.length; i++){
-            if(warns[list[i]].user.id == user.id){
-                found = list[i];
-                break;
-            }
-        }
-        if(!found) return bot.sendMessage(message, 'Nothing found for this user');
-        bot.sendMessage(message, `Delete the case of ${warns[found].user.name}\nReason: ${warns[found].reason}`);
-        delete warns[found];
-        fs.writeFile("./data/warns.json", JSON.stringify(warns))
-    }else{
-        bot.sendMessage(message, "You have to be able to kick/ban members to use this command")
-    }
-}
-
-  if (message.content.startsWith(prefix + 'pause')) {
-    if(message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1){
-      let player = bot.voiceConnections.get('server', message.server);
-      if(!player || !player.playing) return bot.sendMessage(message, 'The bot is not playing');
-      player.pause();
-      bot.sendMessage(message, "Pausing music...");
-    }else{
-      bot.sendMessage(message, 'Only the admins can use this command');
-    }
-  }
-
-  if (message.content.startsWith(prefix + 'reminder')) {
-    try {
-      let c = message.content.substring(message.content.indexOf(' ') + 1, message.content.length)
-      let msg = c.split(" ").splice(1).join(" ").split("|")
-      msg[0] = msg[0].replace(/\s/g, '')
-      let time = parseTime(msg[0])
-      let reminder = msg[1].trim()
-      message.reply("I will PM you a reminder to " + reminder + " in " + time + "!")
-      setTimeout(function() {
-        message.author.sendMessage(message.author + " Reminder: " + reminder)
-      }, time.countdown)
-
-      function parseTime(str) {
-        let num, time
-        if (str.indexOf(" ") > -1) {
-          num = str.substring(0, str.indexOf(" "))
-          time = str.substring(str.indexOf(" ") + 1).toLowerCase()
+    if(command === `avatar`){
+	if(msg.channel.type === 'dm') return msg.channel.send("Nope Nope!! u can't use avatar command in DMs (:")
+        let mentions = msg.mentions.members.first()
+        if(!mentions) {
+          let sicon = msg.author.avatarURL
+          let embed = new Discord.RichEmbed()
+          .setImage(msg.author.avatarURL)
+          .setColor("#5074b3")
+          msg.channel.send({embed})
         } else {
-          for (let i = 0; i < str.length; i++) {
-            if (str.substring(0, i) && !isNaN(str.substring(0, i)) && isNaN(str.substring(0, i + 1))) {
-              num = str.substring(0, i)
-              time = str.substring(i)
-              break
-            }
-          }
+          let sicon = mentions.user.avatarURL
+          let embed = new Discord.RichEmbed()
+          .setColor("#5074b3")
+          .setImage(sicon)
+          msg.channel.send({embed})
         }
-        if (!num || isNaN(num) || num < 1 || !time || ["d", "day", "days", "h", "hr", "hrs", "hour", "hours", "m", "min", "mins", "minute", "minutes", "s", "sec", "secs", "second", "seconds"].indexOf(time) == -1) {
-          return
-        }
-        let countdown = 0
-        switch (time) {
-          case "d":
-          case "day":
-          case "days":
-            countdown = num * 86400000
-            break
-          case "h":
-          case "hr":
-          case "hrs":
-          case "hour":
-          case "hours":
-            countdown = num * 3600000
-            break
-          case "m":
-          case "min":
-          case "mins":
-          case "minute":
-          case "minutes":
-            countdown = num * 60000
-            break
-          case "s":
-          case "sec":
-          case "secs":
-          case "second":
-          case "seconds":
-            countdown = num * 1000
-            break
-        }
-        return {
-          num: num,
-          time: time,
-          countdown: countdown
-        }
-      }
-    } catch (err) {
-      message.channel.sendMessage("Invalid arguments.")
-    }
-  }
-
-  if (message.content.startsWith(prefix + 'shutdown')) {
-    if (message.sender.id === config.owner_id || config.admins.indexOf(message.author.id)!= -1) {
-      bot.sendMessage(message, "Shutdown has been **initiated**.\nShutting down...")
-      setTimeout(function() {
-        bot.logout()
-      }, 1000)
-      setTimeout(function() {
-        process.exit()
-      }, 2000)
-    }
-  }
-
-if (message.content.startsWith(prefix + 'warn')) {
-    if (message.channel.permissionsOf(message.sender).hasPermission("kickMembers") || message.channel.permissionsOf(message.sender).hasPermission("banMembers")) {
-      let c = message.content
-      let usr = message.mentions[0]
-      if(!usr) return bot.sendMessage(message, "You need to mention the user");
-      let rsn = c.split(" ").splice(1).join(" ").replace(usr, "").replace("<@!" + usr.id + ">", "")
-      let caseid = genToken(20)
-
-      function genToken(length) {
-        let key = ""
-        let possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-
-        for (let i = 0; i < length; i++) {
-          key += possible.charAt(Math.floor(Math.random() * possible.length))
-        }
-
-        return key
-      }
-
-      warns[caseid] = {
-        "admin": {
-          "name": message.sender.name,
-          "discrim": message.sender.discriminator,
-          "id": message.sender.id
-        },
-        "user": {
-          "name": usr.name,
-          "discrim": usr.discrim,
-          "id": usr.id
-        },
-        "server": {
-          "name": message.channel.server.name,
-          "id": message.channel.server.id,
-          "channel": message.channel.name,
-          "channel_id": message.channel.id
-        },
-        "reason": rsn
-      }
-      bot.sendMessage(message, usr + " was warned for `" + rsn + "`, check logs for more info")
-      fs.writeFile("./data/warns.json", JSON.stringify(warns))
-    } else {
-      bot.sendMessage(message, "You have to be able to kick/ban members to use this command")
-    }
-  }
-
-  if (message.content.startsWith(prefix + 'say')) {
-    if (message.sender.id === config.owner_id || config.admins.indexOf(message.author.id)!= -1) {
-      let say = message.content.split(" ").splice(1).join(" ")
-      bot.sendMessage(message, say)
-    }
-  }
-
-  if (message.content.startsWith(prefix + 'eval')) {
-    if (message.sender.id === config.owner_id) {
-      try {
-        let code = message.content.split(" ").splice(1).join(" ")
-
-        let result = eval(code)
-
-
-        bot.sendMessage(message, "```diff\n+ " + result + "```")
-
-      } catch (err) {
-
-        bot.sendMessage(message, "```diff\n- " + err + "```")
-      }
-    } else {
-      bot.sendMessage(message, "Sorry, you do not have permissisons to use this command, **" + message.author.name + "**.")
-
-    }
-  }
-
-  if (message.content.startsWith(prefix + 'volume')) {
-
-    let suffix = message.content.split(" ")[1];
-    let player = bot.voiceConnections.get('server', message.server);
-    if(!player || !player.playing) return bot.sendMessage(message, 'No, music is playing at this time.');
-    if(!suffix) {
-        bot.sendMessage(message, `The current volume is ${(player.getVolume() * 50)}`);
-    }else if(message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1){
-        let volumeBefore = player.getVolume();
-        let volume = parseInt(suffix);
-        if(volume > 50) return bot.sendMessage(message, "The music can't be higher then 50");
-        player.setVolume((volume / 50));
-        bot.sendMessage(message, `Volume changed from ${(volumeBefore * 50)} to ${volume}`);
-    }else{
-      bot.sendMessage(message, 'Only the admins can change the volume');
-    }
-}
-
-if (message.content.startsWith(prefix + 'resume')) {
-    if(message.server.owner.id == message.author.id || message.author.id == config.owner_id || config.admins.indexOf(message.author.id) != -1){
-      let player = bot.voiceConnections.get('server', message.server);
-      if(!player) return bot.sendMessage(message, 'No, music is playing at this time.');
-      if( player.playing) return bot.sendMessage(message, 'The music is already playing');
-      player.resume();
-      bot.sendMessage(message, "Resuming music...");
-    }else{
-      bot.sendMessage(message, 'Only the adminds can do this command');
-    }
-}
-
-
-
-  if (message.content.startsWith(prefix + 'invite')) {
-    bot.sendMessage(message, "My OAuth URL: " + `http://discordapp.com/oauth2/authorize?client_id=${config.client_id}&scope=bot`)
-  }
-  if (message.content.startsWith(prefix + 'git')) {
-    bot.sendMessage(message, "GitHub URL: **https://github.com/developerCodex/musicbot**")
-  }
-
-  if (message.content.startsWith(prefix + 'about') || message.mentions[0] === bot.user) {
-// Please do not change this... It is in the license
-if(message.content === bot.user + ' help'){
-  var cdb = '```'
-  var msg = `${cdb}fix
-This is an instance of developerCodex's Open source musicbot
-I am written in node.js and use ytdl to source songs and play them!
-To see all my commands type ${prefix}help.${cdb}`
-bot.sendMessage(message, msg)
-return;
-}
-    var cdb = '```'
-    var msg = `${cdb}fix
-This is an instance of developerCodex's Open source musicbot
-I am written in node.js and use ytdl to source songs and play them!
-To see all my commands type ${prefix}help.${cdb}`
-bot.sendMessage(message,msg)
-  }
-
-  if (message.content.startsWith(prefix + 'np') || message.content.startsWith(prefix + 'nowplaying')) {
-    let queue = getQueue(message.server.id);
-    if(queue.length == 0) return bot.sendMessage(message, "No music in queue");
-    bot.sendMessage(message, `${rb}xl\nCurrently playing: ${queue[0].title} | by ${queue[0].requested}${rb}`);
-}
-
-if (message.content.startsWith(prefix + 'queue')) {
-    let queue = getQueue(message.server.id);
-    if(queue.length == 0) return bot.sendMessage(message, "No music in queue");
-    let text = '';
-    for(let i = 0; i < queue.length; i++){
-      text += `${(i + 1)}. ${queue[i].title} | by ${queue[i].requested}\n`
     };
-    bot.sendMessage(message, `${rb}xl\n${text}${rb}`);
-  }
-    }catch(err){
-  console.log("WELL LADS LOOKS LIKE SOMETHING WENT WRONG! Visit MusicBot server for support (https://discord.gg/UbwFDM6) and quote this error:\n\n\n"+err.stack)
-  errorlog[String(Object.keys(errorlog).length)] = {
-"code":err.code,
-    "error":err,
-    "stack":err.stack
-  }
-  fs.writeFile("./data/errors.json",JSON.stringify(errorlog),function(err){
-    if(err) return "Even worse we couldn't write to our error log file! make sure data/errors.json still exists!";
-  })
+});
+/////////////////////////
+////////////////////////
+//////////////////////
+/////////////////////////
+////////////////////////
+//////////////////////
 
+/////////////////////////
+////////////////////////
+//////////////////////
+/////////////////////////
+////////////////////////
+//////////////////////
+client.on('message', async msg => { 
+	if (msg.author.bot) return undefined;
+    if (!msg.content.startsWith(prefix)) return undefined;
+    
+    const args = msg.content.split(' ');
+	const searchString = args.slice(1).join(' ');
+    
+	const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : '';
+	const serverQueue = queue.get(msg.guild.id);
+
+	let command = msg.content.toLowerCase().split(" ")[0];
+	command = command.slice(prefix.length)
+
+	if (command === `play`) {
+		const voiceChannel = msg.member.voiceChannel;
+        
+        if (!voiceChannel) return msg.channel.send("I can't find you in any voice channel!");
+        
+        const permissions = voiceChannel.permissionsFor(msg.client.user);
+        
+        if (!permissions.has('CONNECT')) {
+
+			return msg.channel.send("I don't have enough permissions to join your voice channel!");
+        }
+        
+		if (!permissions.has('SPEAK')) {
+
+			return msg.channel.send("I don't have enough permissions to speak in your voice channel!");
+		}
+
+		if (!permissions.has('EMBED_LINKS')) {
+
+			return msg.channel.sendMessage("I don't have enough permissions to insert a URLs!")
+		}
+
+		if (url.match(/^https?:\/\/(www.youtube.com|youtube.com)\/playlist(.*)$/)) {
+
+			const playlist = await youtube.getPlaylist(url);
+            const videos = await playlist.getVideos();
+            
+
+			for (const video of Object.values(videos)) {
+                
+                const video2 = await youtube.getVideoByID(video.id); 
+                await handleVideo(video2, msg, voiceChannel, true); 
+            }
+			return msg.channel.send(`**${playlist.title}**, Just added to the queue!`);
+		} else {
+
+			try {
+
+                var video = await youtube.getVideo(url);
+                
+			} catch (error) {
+				try {
+
+					var videos = await youtube.searchVideos(searchString, 5);
+					let index = 0;
+                    const embed1 = new Discord.RichEmbed()
+                    .setTitle(":mag_right:  YouTube Search Results :")
+                    .setDescription(`
+                    ${videos.map(video2 => `${++index}. **${video2.title}**`).join('\n')}`)
+                    
+					.setColor("#f7abab")
+					msg.channel.sendEmbed(embed1).then(message =>{message.delete(20000)})
+					
+/////////////////					
+					try {
+
+						var response = await msg.channel.awaitMessages(msg2 => msg2.content > 0 && msg2.content < 11, {
+							maxMatches: 1,
+							time: 15000,
+							errors: ['time']
+						});
+					} catch (err) {
+						console.error(err);
+						return msg.channel.send('No one respone a number!!');
+                    }
+                    
+					const videoIndex = parseInt(response.first().content);
+                    var video = await youtube.getVideoByID(videos[videoIndex - 1].id);
+                    
+				} catch (err) {
+
+					console.error(err);
+					return msg.channel.send("I didn't find any results!");
+				}
+			}
+
+            return handleVideo(video, msg, voiceChannel);
+            
+        }
+        
+	} else if (command === `skip`) {
+
+		if (!msg.member.voiceChannel) return msg.channel.send("You Must be in a Voice channel to Run the Music commands!");
+        if (!serverQueue) return msg.channel.send("There is no Queue to skip!!");
+
+		serverQueue.connection.dispatcher.end('Ok, skipped!');
+        return undefined;
+        
+	} else if (command === `stop`) {
+
+		if (!msg.member.voiceChannel) return msg.channel.send("You Must be in a Voice channel to Run the Music commands!");
+        if (!serverQueue) return msg.channel.send("There is no Queue to stop!!");
+        
+		serverQueue.songs = [];
+		serverQueue.connection.dispatcher.end('Ok, stopped & disconnected from your Voice channel');
+        return undefined;
+        
+	} else if (command === `vol`) {
+
+		if (!msg.member.voiceChannel) return msg.channel.send("You Must be in a Voice channel to Run the Music commands!");
+		if (!serverQueue) return msg.channel.send('You only can use this command while music is playing!');
+        if (!args[1]) return msg.channel.send(`The bot volume is **${serverQueue.volume}**`);
+        
+		serverQueue.volume = args[1];
+        serverQueue.connection.dispatcher.setVolumeLogarithmic(args[1] / 50);
+        
+        return msg.channel.send(`Volume Now is **${args[1]}**`);
+
+	} else if (command === `np`) {
+
+		if (!serverQueue) return msg.channel.send('There is no Queue!');
+		const embedNP = new Discord.RichEmbed()
+	    .setDescription(`Now playing **${serverQueue.songs[0].title}**`)
+        return msg.channel.sendEmbed(embedNP);
+        
+	} else if (command === `queue`) {
+		
+		if (!serverQueue) return msg.channel.send('There is no Queue!!');
+		let index = 0;
+//	//	//
+		const embedqu = new Discord.RichEmbed()
+        .setTitle("The Queue Songs :")
+        .setDescription(`
+        ${serverQueue.songs.map(song => `${++index}. **${song.title}**`).join('\n')}
+**Now playing :** **${serverQueue.songs[0].title}**`)
+        .setColor("#f7abab")
+		return msg.channel.sendEmbed(embedqu);
+	} else if (command === `pause`) {
+		if (serverQueue && serverQueue.playing) {
+			serverQueue.playing = false;
+			serverQueue.connection.dispatcher.pause();
+			return msg.channel.send('Ok, paused');
+		}
+		return msg.channel.send('There is no Queue to Pause!');
+	} else if (command === "resume") {
+
+		if (serverQueue && !serverQueue.playing) {
+			serverQueue.playing = true;
+			serverQueue.connection.dispatcher.resume();
+            return msg.channel.send('Ok, resumed!');
+            
+		}
+		return msg.channel.send('Queue is empty!');
+	}
+
+	return undefined;
+});
+
+async function handleVideo(video, msg, voiceChannel, playlist = false) {
+	const serverQueue = queue.get(msg.guild.id);
+	console.log(video);
+	
+
+	const song = {
+		id: video.id,
+		title: Util.escapeMarkdown(video.title),
+		url: `https://www.youtube.com/watch?v=${video.id}`
+	};
+	if (!serverQueue) {
+		const queueConstruct = {
+			textChannel: msg.channel,
+			voiceChannel: voiceChannel,
+			connection: null,
+			songs: [],
+			volume: 5,
+			playing: true
+		};
+		queue.set(msg.guild.id, queueConstruct);
+
+		queueConstruct.songs.push(song);
+
+		try {
+			var connection = await voiceChannel.join();
+			queueConstruct.connection = connection;
+			play(msg.guild, queueConstruct.songs[0]);
+		} catch (error) {
+			console.error(`I could not join the voice channel: ${error}!`);
+			queue.delete(msg.guild.id);
+			return msg.channel.send(`Can't join this channel: ${error}!`);
+		}
+	} else {
+		serverQueue.songs.push(song);
+		console.log(serverQueue.songs);
+		if (playlist) return undefined;
+		else return msg.channel.send(`**${song.title}**, just added to the queue! `);
+	} 
+	return undefined;
+}
+
+function play(guild, song) {
+	const serverQueue = queue.get(guild.id);
+
+	if (!song) {
+		queue.delete(guild.id);
+		return;
+	}
+	console.log(serverQueue.songs);
+
+	const dispatcher = serverQueue.connection.playStream(ytdl(song.url))
+		.on('end', reason => {
+			if (reason === 'Stream is not generating quickly enough.') console.log('Song ended.');
+			else console.log(reason);
+			serverQueue.songs.shift();
+			play(guild, serverQueue.songs[0]);
+		})
+		.on('error', error => console.error(error));
+	dispatcher.setVolumeLogarithmic(serverQueue.volume / 5);
+
+	serverQueue.textChannel.send(`**${song.title}**, is now playing!`);
+}
+
+
+client.on('message', message => {
+    if (message.content === 'help') {
+        let helpEmbed = new Discord.RichEmbed()
+        .setTitle('**أوامر الميوزك...**')
+        .setDescription('**برفكس البوت (!)**')
+        .addField('play', 'لتشغيل اغنية')
+        .addField('join', 'دخول رومك الصوتي')
+        .addField('disconnect', 'الخروج من رومك الصوتي')
+        .addField('skip', 'تخطي الأغنية')
+        .addField('pause', 'ايقاف الاغنية مؤقتا')
+        .addField('resume', 'تكملة الاغنية')
+        .addField('queue', 'اظهار قائمة التشغيل')
+        .addField('np', 'اظهار الاغنية اللي انت مشغلها حاليا')
+        .setFooter('(general_commands) لاظهار الاوامر العامة')
+      message.channel.send(helpEmbed);
+    }
+});
+
+client.on('message', message => {
+    if (message.content === 'general_commands') {
+        let helpEmbed = new Discord.RichEmbed()
+        .setTitle('**أوامر عامة...**')
+        .addField('avatar', "افاتار الشخص المطلوب")
+        .addField('gif', 'البحث عن جيف انت تطلبه')
+        .addField('ping', 'معرفة ping البوت')
+        .setFooter('المزيد قريبا ان شاء الله!')
+      message.channel.send(helpEmbed);
+    }
+});
+
+
+
+
+
+client.on('message', msg => {
+ if (msg.content === "1help") {
+msg.channel.send('**Check your `Privat` To see the `commands` 🎶**');
+msg.react('💌')
+ msg.author.sendMessage(`
+** ${client.user.tag} Commands ** 
+ 
+        =====  Commands: ===== 
+${prefix}\`\ Avatar \`\ - checks the bot's latency 
+${prefix}\`\ ping \`\ - checks the bot's latency 
+${prefix}\`\ settings \`\ - checks the bot's latency  
+		 
+=====  Music: =====  
+${prefix}\`\ play <url>or<title> \`\ - plays the provided song 
+${prefix}\`\ skip \`\ - votes to skip the current song  
+${prefix}\`\ stop \`\ - stops the current song and clears the queue 
+${prefix}\`\ playnow \`\ - shows the song that is currently playing 
+		  
+=====  DJ: ===== 	   
+		 	 
+${prefix}\`\ Volume [0-150]\`\ - sets or shows volume
+${prefix}\`\ repeat \`\ - Rpeat the song
+${prefix}\`\ forcestop \`\ - skips the current song
+	
+=====  Owner: ===== 
+		 
+${prefix}\`\ setdj \`\ - sets the DJ role for certain music commands 
+${prefix}\`\ settc \`\ - sets the text channel for music commands 
+${prefix}\`\ setvc \`\ - sets the voice channel for playing music
+${prefix}\`\ setavatar \`\ - Setbot avatar 
+${prefix}\`\ setgame \`\ - Set the Bot game 
+${prefix}\`\ sett \`\ - set the twitch for the bot 
+${prefix}\`\ setname \`\ - change the bot name 
+	  
+ ===== Bot Owner ID ${Owner} ===== `)
+
+
+		
+		
+		
+		
+		
+
+ }
+});      
+
+client.on('message', msg => {
+
+    if (msg.content == '1join') {
+        if (msg.member.voiceChannel) {
+
+     if (msg.member.voiceChannel.joinable) {
+         msg.member.voiceChannel.join().then(msg.react('✅'));
+     }
+    }
 }
 })
+client.on('ready', () => {
+    client.channels.get("486311818646781954").join();
+});
 
+client.on('ready', () => {
+var x = client.channels.get("486309931050336257");
+if (x) x.join();
+});
+  
+client.login(process.env.BOT_TOKEN);const Discord = require('discord.js');
+
+const Util = require('discord.js');
+
+const getYoutubeID = require('get-youtube-id');
+
+const fetchVideoInfo = require('youtube-info');
+
+const YouTube = require('simple-youtube-api');
+
+const youtube = new YouTube("AIzaSyAdORXg7UZUo7sePv97JyoDqtQVi3Ll0b8");
+
+const queue = new Map();
+
+const ffmpeg = require('ffmpeg');
+
+const ytdl = require('ytdl-core');
+
+const fs = require('fs');
+
+const gif = require("gif-search");
+
+const client = new Discord.Client({disableEveryone: true});
+
+const prefix = "1";
+
+var servers = {};
+function play(connection, message, args) {
+  var server = servers[message.guild.id];
+  server.dispatcher = connection.playStream(YTDL(args[0]), {filter: "audioonly"});
+  server.queue.shift();
+  server.dispatcher.on("end", function() {
+    if (server.queue[0]) play(connection, message);
+    else connection.disconnect();
+  });
+}
+
+
+client.on('message', message =>{
+  if(message.content.startsWith('join')){
+    const voiceChannel = message.member.voiceChannel
+    voiceChannel.join();
+    message.channel.send("تم الأتصال بالروم الصوتي")
+}})
+/////////////////////////
+////////////////////////
+
+client.on('message', message =>{
+  if(message.content.startsWith('join')){
+    const voiceChannel = message.member.voiceChannel
+    voiceChannel.join();
+    message.channel.send("تم الأتصال بالروم الصوتي")
+}})
+
+const devs = ['422829377139638273' , '' , '' , ''];
+const adminprefix = "!";
+client.on('message', message => {
+    var argresult = message.content.split(` `).slice(1).join(' ');
+      if (!devs.includes(message.author.id)) return;
+      
+  if (message.content.startsWith(adminprefix + 'ply')) {
+    client.user.setGame(argresult);
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  } else 
+  if (message.content.startsWith(adminprefix + 'wt')) {
+  client.user.setActivity(argresult, {type:'WATCHING'});
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  } else 
+  if (message.content.startsWith(adminprefix + 'ls')) {
+  client.user.setActivity(argresult , {type:'LISTENING'});
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  } else 
+  if (message.content.startsWith(adminprefix + 'st')) {
+    client.user.setGame(argresult, "https://www.twitch.tv/حب بلا حدود");
+      message.channel.sendMessage(`**✅   ${argresult}**`)
+  }
+  });
+
+
+client.on('message', async msg =>{
+	if (msg.author.bot) return undefined;
+    if (!msg.content.startsWith(prefix)) return undefined;
+    
+    let args = msg.content.split(' ');
+
+	let command = msg.content.toLowerCase().split(" ")[0];
+	command = command.slice(prefix.length)
+
+    if(command === `ping`) {
+    let embed = new Discord.RichEmbed()
+    .setColor(3447003)
+    .setTitle("Pong!!")
+    .setDescription(`${client.ping} ms,`)
+    .setFooter(`Requested by | ${msg.author.tag}`);
+    msg.delete().catch(O_o=>{})
+    msg.channel.send(embed);
+    }
+});
+/////////////////////////
+////////////////////////
+//////////////////////
+client.on('message', async msg =>{
+	if (msg.author.bot) return undefined;
+    if (!msg.content.startsWith(prefix)) return undefined;
+    
+    let args = msg.content.split(' ');
+
+	let command = msg.content.toLowerCase().split(" ")[0];
+	command = command.slice(prefix.length)
+
+    if(command === `avatar`){
+	if(msg.channel.type === 'dm') return msg.channel.send("Nope Nope!! u can't use avatar command in DMs (:")
+        let mentions = msg.mentions.members.first()
+        if(!mentions) {
+          let sicon = msg.author.avatarURL
+          let embed = new Discord.RichEmbed()
+          .setImage(msg.author.avatarURL)
+          .setColor("#5074b3")
+          msg.channel.send({embed})
+        } else {
+          let sicon = mentions.user.avatarURL
+          let embed = new Discord.RichEmbed()
+          .setColor("#5074b3")
+          .setImage(sicon)
+          msg.channel.send({embed})
+        }
+    };
+});
+/////////////////////////
+////////////////////////
+//////////////////////
+/////////////////////////
+////////////////////////
+//////////////////////
+
+/////////////////////////
+////////////////////////
+//////////////////////
+/////////////////////////
+////////////////////////
+//////////////////////
+client.on('message', async msg => { 
+	if (msg.author.bot) return undefined;
+    if (!msg.content.startsWith(prefix)) return undefined;
+    
+    const args = msg.content.split(' ');
+	const searchString = args.slice(1).join(' ');
+    
+	const url = args[1] ? args[1].replace(/<(.+)>/g, '$1') : '';
+	const serverQueue = queue.get(msg.guild.id);
+
+	let command = msg.content.toLowerCase().split(" ")[0];
+	command = command.slice(prefix.length)
+
+	if (command === `play`) {
+		const voiceChannel = msg.member.voiceChannel;
+        
+        if (!voiceChannel) return msg.channel.send("I can't find you in any voice channel!");
+        
+        const permissions = voiceChannel.permissionsFor(msg.client.user);
+        
+        if (!permissions.has('CONNECT')) {
+
+			return msg.channel.send("I don't have enough permissions to join your voice channel!");
+        }
+        
+		if (!permissions.has('SPEAK')) {
+
+			return msg.channel.send("I don't have enough permissions to speak in your voice channel!");
+		}
+
+		if (!permissions.has('EMBED_LINKS')) {
+
+			return msg.channel.sendMessage("I don't have enough permissions to insert a URLs!")
+		}
+
+		if (url.match(/^https?:\/\/(www.youtube.com|youtube.com)\/playlist(.*)$/)) {
+
+			const playlist = await youtube.getPlaylist(url);
+            const videos = await playlist.getVideos();
+            
+
+			for (const video of Object.values(videos)) {
+                
+                const video2 = await youtube.getVideoByID(video.id); 
+                await handleVideo(video2, msg, voiceChannel, true); 
+            }
+			return msg.channel.send(`**${playlist.title}**, Just added to the queue!`);
+		} else {
+
+			try {
+
+                var video = await youtube.getVideo(url);
+                
+			} catch (error) {
+				try {
+
+					var videos = await youtube.searchVideos(searchString, 5);
+					let index = 0;
+                    const embed1 = new Discord.RichEmbed()
+                    .setTitle(":mag_right:  YouTube Search Results :")
+                    .setDescription(`
+                    ${videos.map(video2 => `${++index}. **${video2.title}**`).join('\n')}`)
+                    
+					.setColor("#f7abab")
+					msg.channel.sendEmbed(embed1).then(message =>{message.delete(20000)})
+					
+/////////////////					
+					try {
+
+						var response = await msg.channel.awaitMessages(msg2 => msg2.content > 0 && msg2.content < 11, {
+							maxMatches: 1,
+							time: 15000,
+							errors: ['time']
+						});
+					} catch (err) {
+						console.error(err);
+						return msg.channel.send('No one respone a number!!');
+                    }
+                    
+					const videoIndex = parseInt(response.first().content);
+                    var video = await youtube.getVideoByID(videos[videoIndex - 1].id);
+                    
+				} catch (err) {
+
+					console.error(err);
+					return msg.channel.send("I didn't find any results!");
+				}
+			}
+
+            return handleVideo(video, msg, voiceChannel);
+            
+        }
+        
+	} else if (command === `skip`) {
+
+		if (!msg.member.voiceChannel) return msg.channel.send("You Must be in a Voice channel to Run the Music commands!");
+        if (!serverQueue) return msg.channel.send("There is no Queue to skip!!");
+
+		serverQueue.connection.dispatcher.end('Ok, skipped!');
+        return undefined;
+        
+	} else if (command === `stop`) {
+
+		if (!msg.member.voiceChannel) return msg.channel.send("You Must be in a Voice channel to Run the Music commands!");
+        if (!serverQueue) return msg.channel.send("There is no Queue to stop!!");
+        
+		serverQueue.songs = [];
+		serverQueue.connection.dispatcher.end('Ok, stopped & disconnected from your Voice channel');
+        return undefined;
+        
+	} else if (command === `vol`) {
+
+		if (!msg.member.voiceChannel) return msg.channel.send("You Must be in a Voice channel to Run the Music commands!");
+		if (!serverQueue) return msg.channel.send('You only can use this command while music is playing!');
+        if (!args[1]) return msg.channel.send(`The bot volume is **${serverQueue.volume}**`);
+        
+		serverQueue.volume = args[1];
+        serverQueue.connection.dispatcher.setVolumeLogarithmic(args[1] / 50);
+        
+        return msg.channel.send(`Volume Now is **${args[1]}**`);
+
+	} else if (command === `np`) {
+
+		if (!serverQueue) return msg.channel.send('There is no Queue!');
+		const embedNP = new Discord.RichEmbed()
+	    .setDescription(`Now playing **${serverQueue.songs[0].title}**`)
+        return msg.channel.sendEmbed(embedNP);
+        
+	} else if (command === `queue`) {
+		
+		if (!serverQueue) return msg.channel.send('There is no Queue!!');
+		let index = 0;
+//	//	//
+		const embedqu = new Discord.RichEmbed()
+        .setTitle("The Queue Songs :")
+        .setDescription(`
+        ${serverQueue.songs.map(song => `${++index}. **${song.title}**`).join('\n')}
+**Now playing :** **${serverQueue.songs[0].title}**`)
+        .setColor("#f7abab")
+		return msg.channel.sendEmbed(embedqu);
+	} else if (command === `pause`) {
+		if (serverQueue && serverQueue.playing) {
+			serverQueue.playing = false;
+			serverQueue.connection.dispatcher.pause();
+			return msg.channel.send('Ok, paused');
+		}
+		return msg.channel.send('There is no Queue to Pause!');
+	} else if (command === "resume") {
+
+		if (serverQueue && !serverQueue.playing) {
+			serverQueue.playing = true;
+			serverQueue.connection.dispatcher.resume();
+            return msg.channel.send('Ok, resumed!');
+            
+		}
+		return msg.channel.send('Queue is empty!');
+	}
+
+	return undefined;
+});
+
+async function handleVideo(video, msg, voiceChannel, playlist = false) {
+	const serverQueue = queue.get(msg.guild.id);
+	console.log(video);
+	
+
+	const song = {
+		id: video.id,
+		title: Util.escapeMarkdown(video.title),
+		url: `https://www.youtube.com/watch?v=${video.id}`
+	};
+	if (!serverQueue) {
+		const queueConstruct = {
+			textChannel: msg.channel,
+			voiceChannel: voiceChannel,
+			connection: null,
+			songs: [],
+			volume: 5,
+			playing: true
+		};
+		queue.set(msg.guild.id, queueConstruct);
+
+		queueConstruct.songs.push(song);
+
+		try {
+			var connection = await voiceChannel.join();
+			queueConstruct.connection = connection;
+			play(msg.guild, queueConstruct.songs[0]);
+		} catch (error) {
+			console.error(`I could not join the voice channel: ${error}!`);
+			queue.delete(msg.guild.id);
+			return msg.channel.send(`Can't join this channel: ${error}!`);
+		}
+	} else {
+		serverQueue.songs.push(song);
+		console.log(serverQueue.songs);
+		if (playlist) return undefined;
+		else return msg.channel.send(`**${song.title}**, just added to the queue! `);
+	} 
+	return undefined;
+}
+
+function play(guild, song) {
+	const serverQueue = queue.get(guild.id);
+
+	if (!song) {
+		queue.delete(guild.id);
+		return;
+	}
+	console.log(serverQueue.songs);
+
+	const dispatcher = serverQueue.connection.playStream(ytdl(song.url))
+		.on('end', reason => {
+			if (reason === 'Stream is not generating quickly enough.') console.log('Song ended.');
+			else console.log(reason);
+			serverQueue.songs.shift();
+			play(guild, serverQueue.songs[0]);
+		})
+		.on('error', error => console.error(error));
+	dispatcher.setVolumeLogarithmic(serverQueue.volume / 5);
+
+	serverQueue.textChannel.send(`**${song.title}**, is now playing!`);
+}
+
+
+client.on('message', message => {
+    if (message.content === 'help') {
+        let helpEmbed = new Discord.RichEmbed()
+        .setTitle('**أوامر الميوزك...**')
+        .setDescription('**برفكس البوت (!)**')
+        .addField('play', 'لتشغيل اغنية')
+        .addField('join', 'دخول رومك الصوتي')
+        .addField('disconnect', 'الخروج من رومك الصوتي')
+        .addField('skip', 'تخطي الأغنية')
+        .addField('pause', 'ايقاف الاغنية مؤقتا')
+        .addField('resume', 'تكملة الاغنية')
+        .addField('queue', 'اظهار قائمة التشغيل')
+        .addField('np', 'اظهار الاغنية اللي انت مشغلها حاليا')
+        .setFooter('(general_commands) لاظهار الاوامر العامة')
+      message.channel.send(helpEmbed);
+    }
+});
+
+client.on('message', message => {
+    if (message.content === 'general_commands') {
+        let helpEmbed = new Discord.RichEmbed()
+        .setTitle('**أوامر عامة...**')
+        .addField('avatar', "افاتار الشخص المطلوب")
+        .addField('gif', 'البحث عن جيف انت تطلبه')
+        .addField('ping', 'معرفة ping البوت')
+        .setFooter('المزيد قريبا ان شاء الله!')
+      message.channel.send(helpEmbed);
+    }
+});
+
+
+
+
+
+client.on('message', msg => {
+ if (msg.content === "5help") {
+msg.channel.send('**Check your `Privat` To see the `commands` 🎶**');
+msg.react('💌')
+ msg.author.sendMessage(`
+** ${client.user.tag} Commands ** 
+ 
+        =====  Commands: ===== 
+${prefix}\`\ Avatar \`\ - checks the bot's latency 
+${prefix}\`\ ping \`\ - checks the bot's latency 
+${prefix}\`\ settings \`\ - checks the bot's latency  
+		 
+=====  Music: =====  
+${prefix}\`\ play <url>or<title> \`\ - plays the provided song 
+${prefix}\`\ skip \`\ - votes to skip the current song  
+${prefix}\`\ stop \`\ - stops the current song and clears the queue 
+${prefix}\`\ playnow \`\ - shows the song that is currently playing 
+		  
+=====  DJ: ===== 	   
+		 	 
+${prefix}\`\ Volume [0-150]\`\ - sets or shows volume
+${prefix}\`\ repeat \`\ - Rpeat the song
+${prefix}\`\ forcestop \`\ - skips the current song
+	
+=====  Owner: ===== 
+		 
+${prefix}\`\ setdj \`\ - sets the DJ role for certain music commands 
+${prefix}\`\ settc \`\ - sets the text channel for music commands 
+${prefix}\`\ setvc \`\ - sets the voice channel for playing music
+${prefix}\`\ setavatar \`\ - Setbot avatar 
+${prefix}\`\ setgame \`\ - Set the Bot game 
+${prefix}\`\ sett \`\ - set the twitch for the bot 
+${prefix}\`\ setname \`\ - change the bot name 
+	  
+ ===== Bot Owner ID ${Owner} ===== `)
+
+
+		
+		
+		
+		
+		
+
+ }
+});      
+
+client.on('message', msg => {
+
+    if (msg.content == '5join') {
+        if (msg.member.voiceChannel) {
+
+     if (msg.member.voiceChannel.joinable) {
+         msg.member.voiceChannel.join().then(msg.react('✅'));
+     }
+    }
+}
+})
+client.on('ready', () => {
+    client.channels.get("486311818646781954").join();
+});
+
+client.on('ready', () => {
+var x = client.channels.get("486309931050336257");
+if (x) x.join();
+});
+  
 client.login(process.env.BOT_TOKEN);
