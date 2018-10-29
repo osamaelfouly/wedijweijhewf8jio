@@ -1,5 +1,3 @@
-const Discord = require('discord.js');
-
 const getYoutubeID = require('get-youtube-id');
 
 const fetchVideoInfo = require('youtube-info');
